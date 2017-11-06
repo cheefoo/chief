@@ -225,6 +225,7 @@ aws es create-elasticsearch-domain --domain-name chief --elasticsearch-version 5
 
 1. SSH into the KPL Instance and edit Edit the *.properties file for KCL application in ```~/chief/src/main/resources/``` folder. Please change the values for your own AWS resources.
  - ```OrderProducer.properties``` : The setting of KCL application (2) in diagram
+
   | Key           | Default                                        | Description                                                                     |
   | :------------ | :--------------------------------------------- | :------------------------------------------------------------------------------ |
   | kinesisOutputStream    | OrdersStream| The destination Kinesis Stream name for producer. |
@@ -233,6 +234,7 @@ aws es create-elasticsearch-domain --domain-name chief --elasticsearch-version 5
   | producerDuration     | 7200 | The duration of running producer program.|
 
  - ```JobResultsProducer.properties``` : The setting of KCL application (4) in diagram
+
   | Key           | Default                                        | Description                                                                     |
   | :------------ | :--------------------------------------------- | :------------------------------------------------------------------------------ |
   | kinesisOutputStream    | JobResultsStream| The destination Kinesis Stream name for producer. |
