@@ -13,7 +13,7 @@ The application consists of 5 components:
 6. Job result stream consumer KCL application that archives de-duped datas to Elasticsearch
 
 ## Architecture Diagrams:
-![alt tag](https://github.com/rirakuchell/chief/blob/master/Archie1.png)
+![alt tag](https://github.com/rirakuchell/chief/blob/master/architecture-diagram.png)
 
 ## Requirements
 1. An Amazon Web Services [Account](https://portal.aws.amazon.com/billing/signup#/start)
