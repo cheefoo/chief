@@ -23,9 +23,9 @@ if len(sys.argv) != 3:
 numberRuns = int(sys.argv[1])
 numberRows = int(sys.argv[2])
 
-DB_USER = ''*******''
-DB_PASSWORD = '*******'
-DB_HOST = 'chiefcluster.cluster-example.us-east-1.rds.amazonaws.com'
+DB_USER = 'user'
+DB_PASSWORD = '***********'
+DB_HOST = 'chiefcluster.cluster-cexample.us-east-1.rds.amazonaws.com'
 DB_NAME = 'chief'
 
 conn = mysql.connector.connect(user=DB_USER, password=DB_PASSWORD, host=DB_HOST, database=DB_NAME)
@@ -66,6 +66,7 @@ if __name__ == "__main__":
         destFile = str(uuid.uuid4()) + ".json"
         file_object = open(targetDir + "/" + destFile,"a")
 
+        vallist = []
         def create_jobresults():
             x = 0
             for orderid, order in orderdatas.items():
@@ -76,6 +77,7 @@ if __name__ == "__main__":
                 weight = random.uniform(2,500)
                 hip = random.uniform(2,120)
                 waist = random.uniform(2,80)
+                vallist.append("('" + orderid + "')")
                 timestamp = strftime("%Y/%m/%d %H:%M:%S", gmtime())
                 if x == 0:
                     file_object.write('[')
@@ -92,6 +94,17 @@ if __name__ == "__main__":
         if __name__ == "__main__":
             create_jobresults()
             file_object.close()
+
+            vals = ",".join(vallist)
+            conn = mysql.connector.connect(user=DB_USER, password=DB_PASSWORD, host=DB_HOST, database=DB_NAME)
+            cur = conn.cursor()
+            stmt = "INSERT INTO orders (orderid) VALUES{vals} ON DUPLICATE KEY UPDATE processedtimestamp = now();".format(vals=vals)
+            #print(stmt)
+            cur.execute(stmt)
+            conn.commit()
+            cur.close
+            conn.close
+
             naptime=random.randint(3,40)
             print("generated " + str(numberRows) + " records into " + targetDir + "/" + destFile)
             print("sleeping for " + str(naptime) + " seconds")
