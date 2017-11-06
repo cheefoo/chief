@@ -13,7 +13,7 @@ The application consists of 5 components:
 6. Job result stream consumer KCL application that archives de-duped datas to Elasticsearch
 
 ## Architecture Diagrams:
-![alt tag](https://github.com/rirakuchell/chief/blob/master/architecture-diagram.png)
+![alt tag](https://github.com/rirakuchell/chief/blob/master/Archie1.png)
 
 ## Requirements
 1. An Amazon Web Services [Account](https://portal.aws.amazon.com/billing/signup#/start)
@@ -23,8 +23,6 @@ The application consists of 5 components:
   3.2. Two IAM roles, Instance Profiles and [Policies](http://docs.aws.amazon.com/streams/latest/dev/controlling-access.html) required for the KCL and KPL instances
   3.3. Two AWS EC2 Instances based on AmazonLinux with dependencies pre-installed
   3.3. An Amazon Aurora cluster(for final de-dupe)
- - The Aurora cluster must be configured to be able to read orders and job results data from S3. Please refer to the following document to complete this.
- - http://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Aurora.LoadFromS3.html
   3.4. An Amazon Elasticsearch Service domain
   3.5. An Amazon S3 bucket
 4. When the KCL is initiated, DynamoDB tables for each applications are created
@@ -175,6 +173,9 @@ aws rds create-db-cluster --db-cluster-identifier chiefcluster --engine aurora \
 
   Please make sure to set the security group ```--vpc-security-group-ids``` is set to connect from KPL/KCL app/generator script instances.
 
+Also the Aurora cluster must be configured to be able to read orders and job results data from S3. Please refer to the following document to complete this.
+ - http://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Aurora.LoadFromS3.html
+
 7. Create an Amazon S3 bucket
   Please change the bucket name that you specified step 3.
 
@@ -218,81 +219,97 @@ aws es create-elasticsearch-domain --domain-name chief --elasticsearch-version 5
   aws ec2 create-tags --resources i-0879e274caexample --tags Key=Name,Value="Chief-KCLInstance"
   ```
 
-
-
-```
-CREATE TABLE orders (
-	orderid VARCHAR(73) NOT NULL,
-	orderdata TEXT DEFAULT NULL,
-	processedtimestamp DATETIME DEFAULT NULL,
-	PRIMARY KEY (`orderid`)
-) ;
-
-CREATE TABLE jobresults (
-	orderid VARCHAR(73) NOT NULL,
-	userid VARCHAR(255) NOT NULL,
-	factoryid VARCHAR(255) NOT NULL,
-	robotid VARCHAR(255) NOT NULL,
-	jobstatus VARCHAR(255) NOT NULL,
-	timestamp DATETIME DEFAULT NULL,
-	PRIMARY KEY (`orderid`)
-);
-```
+11. Dont forget to modify the default security group to allow ssh access.
 
 ## Running a Sample
 
-1. Edit the *.properties file for KCL application in ```/src/main/resources``` folder. Please change the values for your own AWS resources and KCL application names.
- - OrderFactoryS3.properties : The setting of KCL application (2) in diagram
- - OrderElasticsearchS3.properties : The setting of KCL application (4) in diagram
- - JobResultElasticsearch.properties : The setting of KCL application (5) in diagram
- - JobResultNotifyS3.properties : The setting of KCL application (6) in diagram
-2. Edit the *.properties file for log4j in ```/src/main/resources``` folder.
- - log4j.properties : log4j property for KCL application
-3. Build the program using Maven
+1. SSH into the KPL Instance and edit Edit the *.properties file for KCL application in ```~/chief/src/main/resources/``` folder. Please change the values for your own AWS resources.
+ - ```OrderProducer.properties``` : The setting of KCL application (2) in diagram
+  | Key           | Default                                        | Description                                                                     |
+  | :------------ | :--------------------------------------------- | :------------------------------------------------------------------------------ |
+  | kinesisOutputStream    | OrdersStream| The destination Kinesis Stream name for producer. |
+  | regionName   | us-east-1                                           | AWS region name for Kinesis Streams |
+  | dataFolder    | /home/ec2-user/chief/kplWatch| The folder path that generated data is placed.|
+  | producerDuration     | 7200 | The duration of running producer program.|
+
+ - ```JobResultsProducer.properties``` : The setting of KCL application (4) in diagram
+  | Key           | Default                                        | Description                                                                     |
+  | :------------ | :--------------------------------------------- | :------------------------------------------------------------------------------ |
+  | kinesisOutputStream    | JobResultsStream| The destination Kinesis Stream name for producer. |
+  | regionName   | us-east-1                                           | AWS region name for Kinesis Streams |
+  | dataFolder    | /home/ec2-user/chief/JobResultsKplWatch| The folder path that generated data is placed.|
+  | producerDuration     | 7200 | The duration of running producer program.|
+2. Edit the log4j.properties file for log4j in ```~/chief/src/main/resources/``` folder.
+3. Login to the Aurora DB instance from the ec2 instance and create the orders and jobresults table by using the ddl chiefdb.sql located in ~/chief/src/main/resources/chiefdb.sql
 ```
-cd chief
+mysql -h chiefcluster.cluster-EXAMPLE.us-east-1.rds.amazonaws.com -u username -p********** mysql < ~/chief/src/main/resources/chiefdb.sql
+```  
+4. SSH into the KCL Instance and edit Edit the *.properties file for KCL application in ```~/chief/src/main/resources/``` folder. Please change the values for your own AWS resources and KCL application names. For details of each property names, please see the actual property files.
+ - ```OrderFactoryS3.properties``` : The setting of KCL application (2) in diagram
+ - ```OrderElasticsearchS3.properties``` : The setting of KCL application (4) in diagram
+ - ```JobResultElasticsearch.properties``` : The setting of KCL application (5) in diagram
+ - ```JobResultNotifyS3.properties``` : The setting of KCL application (6) in diagram
+5. Edit the log4j.properties file for log4j in ```~/chief/src/main/resources/``` folder.
+6. On KPL Instance, Build the program using Maven
+```
+cd ~/chief
 mvn clean compile assembly:single
 ```
-3. Generate orders data using python script and put into Orders Stream using chief-producer.
+7. On KPL Instance, Generate orders data using python script and put into Orders Stream using chief-producer.
 ```
+python ./scripts/generateOnlineOrders.py 1 1000
+python ./scripts/generateStoreOrders.py 1 1000
+nohup java -cp ./target/Kinesis-Chief-0.0.1-SNAPSHOT-jar-with-dependencies.jar com.example.chief.producer.ChiefOrderProducerExecutor
+```
+Once this is done, check Kinesis Streams metrics(e.g. PutRecords.Records) to confirm the put is successfully. The generated data will be backed up to "backup" folder in "dataFolder" property.
+8. On KCL Instance, Build the program using Maven.
+```
+cd ~/chief
+mvn clean compile assembly:single
+```
+9. On KCL Instance, Run orders stream consumer (2) in diagram
+```
+nohup java -cp ./target/Kinesis-Chief-0.0.1-SNAPSHOT-jar-with-dependencies.jar com.example.chief.consumer.ChiefOrderFactoryS3Executor
+```
+The order data will be consumed from Kinesis Stream and put to S3 like key ```s3://bucket/ChiefOrderS3/2017/10/18/16/shardId-000000000000-49577848089610314880664684998647902014807844560960487426```
 
-./target/Kinesis-Chief-0.0.1-SNAPSHOT-jar-with-dependencies.jar
-
+9. On KCL Instance, Run orders stream consumer (4) in diagram
 ```
-
-4. Run orders stream consumer (2) in diagram
-```
-java -cp Kinesis-Chief-0.0.1-SNAPSHOT-jar-with-dependencies.jar com.example.chief.consumer.ChiefOrderFactoryS3Executor
-```
-The order data will be put to S3 like key 's3://bucket/ChiefOrderS3/2017/10/18/16/shardId-000000000000-49577848089610314880664684998647902014807844560960487426'
-
-5. Run orders stream consumer (4) in diagram
-```
-java -cp Kinesis-Chief-0.0.1-SNAPSHOT-jar-with-dependencies.jar com.example.chief.consumer.ChiefOrderElasticsearchS3Executor
+cd ~/chief
+nohup java -cp ./target/Kinesis-Chief-0.0.1-SNAPSHOT-jar-with-dependencies.jar com.example.chief.consumer.ChiefOrderElasticsearchS3Executor
 ```
 The order data will be put to Elasticsearch.
-6. Load orders data periodically from S3 to Aurora for final de-duplication. This can be done with follwing SQL.
+10. Load orders data periodically from S3 to Aurora for final de-duplication. This can be done with follwing SQL.
 ```
+use chief;
 LOAD DATA FROM S3 PREFIX 's3://bucket/ChiefOrderS3/2017/10/18/16/'
 IGNORE
 INTO TABLE orders
 (orderid, orderdata);
 ```
-7. Generate job results data using python script and put into Job results Stream using chief-producer.
-
+7. On KPL instance,Generate job results data using python script and put into Job results Stream using chief-producer.
+```
+python ./scripts/generateJobResults.py 1 1000
+nohup java -cp ./target/Kinesis-Chief-0.0.1-SNAPSHOT-jar-with-dependencies.jar com.example.chief.producer.ChiefJobResultsProducerExecutor
+```
 8. Run job results stream consumer (5) in diagram
 ```
-java -cp Kinesis-Chief-0.0.1-SNAPSHOT-jar-with-dependencies.jar com.example.chief.consumer.ChiefJobResultElasticsearchExecutor
+cd ~/chief
+nohup java -cp ./target/Kinesis-Chief-0.0.1-SNAPSHOT-jar-with-dependencies.jar com.example.chief.consumer.ChiefJobResultElasticsearchExecutor
 ```
 
 9. Run job results stream consumer (6) in diagram
 ```
-java -cp Kinesis-Chief-0.0.1-SNAPSHOT-jar-with-dependencies.jar com.example.chief.consumer.ChiefJobResultNotifyS3Executor
+nohup java -cp ./target/Kinesis-Chief-0.0.1-SNAPSHOT-jar-with-dependencies.jar com.example.chief.consumer.ChiefJobResultNotifyS3Executor
 ```
 10. Load job results data periodically from S3 to Aurora for final de-duplication. This can be done with follwing SQL.
 ```
+use chief;
 LOAD DATA FROM S3 PREFIX 's3://bucket/ChiefJobResultNotifyS3/2017/10/17/17/'
 IGNORE
 INTO TABLE jobresults
 (orderid, userid, factoryid, robotid, jobstatus, timestamp);
 ```
+
+11. Open https://search-domainname-example.us-east-1.es.amazonaws.com/_plugin/kibana/ from your browser. This URL is the endpoint of Elasticsearch Service domain. Make sure the access policy of domain is open from your environment.
+
