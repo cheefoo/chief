@@ -17,13 +17,6 @@ Design Reference Table
 
 Once the orders are submitted, the company will like the orders to be routed to robot-tailors that will handle jobs in real-time.
 Chief Inc. does not keep any inventory of materials in his factory. Chief Inc has 4 robo-factories situated in each geographical zone in the US and 50 stores in the United States.
-1.	Design a logistics and supply chain management system that can help the customer achieve this objective.
-2.	Evaluate your design and validate identify all edge cases that are handled by the design.
-3.	Implement your design
-4.	Generate sample data from the attached and run this through your implementation
-5.	Calculate how many orders are handled per hour for a gender type (send results to a dashboard)
-6.	Calculate how many custom orders are of gender type female and design type velvet per hour (send results to a dashboard).
-7.	Management will like to see a realtime dashboard of completed requests per hour per factory per robot.
 
 This simulation uses the [AWS Kinesis Producer Library (KPL)](http://docs.aws.amazon.com/streams/latest/dev/developing-producers-with-kpl.html) to send customer order records to a Kinesis stream called OrderStream.
 The Robo Tailors consume from the stream using the [AWS Kinesis Client Library (KCL)](http://docs.aws.amazon.com/streams/latest/dev/developing-consumers-with-kcl.html)
