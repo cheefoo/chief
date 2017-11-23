@@ -286,75 +286,75 @@ cd ~/chief
 mvn clean compile assembly:single
 ```
 7. On KPL Instance, Generate orders data using python script and put into Orders Stream using chief-producer.
-   ```
-   python ./scripts/generateOnlineOrders.py 1 1000
-   python ./scripts/generateStoreOrders.py 1 1000
-   ```
-   ```
-   nohup bash -c \
-   "(java -cp ./target/Kinesis-Chief-0.0.1-SNAPSHOT-jar-with-dependencies.jar com.example.chief.producer.ChiefOrderProducerExecutor > ~/chief/logs/ChiefOrderProducerExecutor.log) \
-    &> ~/chief/logs/ChiefOrderProducerExecutor.log" &
-   ```
-Once this is done, check Kinesis Streams metrics(e.g. PutRecords.Records) to confirm the put is successfully. The generated data will be backed up to "backup" folder in "dataFolder" property.
+  ```
+  python ./scripts/generateOnlineOrders.py 1 1000
+  python ./scripts/generateStoreOrders.py 1 1000
+  ```
+  ```
+  nohup bash -c \
+  "(java -cp ./target/Kinesis-Chief-0.0.1-SNAPSHOT-jar-with-dependencies.jar com.example.chief.producer.ChiefOrderProducerExecutor > ~/chief/logs/ChiefOrderProducerExecutor.log) \
+   &> ~/chief/logs/ChiefOrderProducerExecutor.log" &
+  ```
+  Once this is done, check Kinesis Streams metrics(e.g. PutRecords.Records) to confirm the put is successfully. The generated data will be backed up to "backup" folder in "dataFolder" property.
 8. On KCL Instance, Build the program using Maven.
 ```
 cd ~/chief
 mvn clean compile assembly:single
 ```
 9. On KCL Instance, Run orders stream consumer (2) in diagram
-   ```
-   nohup bash -c \
-   "(java -cp ./target/Kinesis-Chief-0.0.1-SNAPSHOT-jar-with-dependencies.jar com.example.chief.consumer.ChiefOrderFactoryS3Executor > ~/chief/logs/ChiefOrderFactoryS3Executor.log) \
-    &> ~/chief/logs/ChiefOrderFactoryS3Executor.log" &
-   ```
-The order data will be consumed from Kinesis Stream and put to S3 like key ```s3://bucket/ChiefOrderS3/2017/10/18/16/shardId-000000000000-49577848089610314880664684998647902014807844560960487426```
+  ```
+  nohup bash -c \
+  "(java -cp ./target/Kinesis-Chief-0.0.1-SNAPSHOT-jar-with-dependencies.jar com.example.chief.consumer.ChiefOrderFactoryS3Executor > ~/chief/logs/ChiefOrderFactoryS3Executor.log) \
+   &> ~/chief/logs/ChiefOrderFactoryS3Executor.log" &
+  ```
+  The order data will be consumed from Kinesis Stream and put to S3 like key ```s3://bucket/ChiefOrderS3/2017/10/18/16/shardId-000000000000-49577848089610314880664684998647902014807844560960487426```
 
 9. On KCL Instance, Run orders stream consumer (4) in diagram
-   ```
-   nohup bash -c \
-   "(java -cp ./target/Kinesis-Chief-0.0.1-SNAPSHOT-jar-with-dependencies.jar com.example.chief.consumer.ChiefOrderElasticsearchS3Executor > ~/chief/logs/ChiefOrderElasticsearchS3Executor.log) \
-    &> ~/chief/logs/ChiefOrderElasticsearchS3Executor.log" &
-   ```
-The order data will be put to Elasticsearch.
+  ```
+  nohup bash -c \
+  "(java -cp ./target/Kinesis-Chief-0.0.1-SNAPSHOT-jar-with-dependencies.jar com.example.chief.consumer.ChiefOrderElasticsearchS3Executor > ~/chief/logs/ChiefOrderElasticsearchS3Executor.log) \
+   &> ~/chief/logs/ChiefOrderElasticsearchS3Executor.log" &
+  ```
+  The order data will be put to Elasticsearch.
 10. Load orders data periodically from S3 to Aurora for final de-duplication. This can be done with follwing SQL.
-```
-use chief;
-LOAD DATA FROM S3 PREFIX 's3://bucket/ChiefOrderS3/2017/10/18/16/'
-IGNORE
-INTO TABLE orders
-(orderid, orderdata);
-```
+  ```
+  use chief;
+  LOAD DATA FROM S3 PREFIX 's3://bucket/ChiefOrderS3/2017/10/18/16/'
+  IGNORE
+  INTO TABLE orders
+  (orderid, orderdata);
+  ```
 7. On KPL instance,Generate job results data using python script and put into Job results Stream using chief-producer.
-   ```
-   cd ~/chief
-   python ./scripts/generateJobResults.py 1 1000
-   ```
-   ```
-   nohup bash -c \
-   "(java -cp ./target/Kinesis-Chief-0.0.1-SNAPSHOT-jar-with-dependencies.jar com.example.chief.producer.ChiefJobResultsProducerExecutor > ~/chief/logs/ChiefJobResultsProducerExecutor.log) \
-    &> ~/chief/logs/ChiefJobResultsProducerExecutor.log" &
-   ```
+  ```
+  cd ~/chief
+  python ./scripts/generateJobResults.py 1 1000
+  ```
+  ```
+  nohup bash -c \
+  "(java -cp ./target/Kinesis-Chief-0.0.1-SNAPSHOT-jar-with-dependencies.jar com.example.chief.producer.ChiefJobResultsProducerExecutor > ~/chief/logs/ChiefJobResultsProducerExecutor.log) \
+   &> ~/chief/logs/ChiefJobResultsProducerExecutor.log" &
+  ```
 8. On KCL instance, Run job results stream consumer (5) in diagram
-   ```
-   nohup bash -c \
-   "(java -cp ./target/Kinesis-Chief-0.0.1-SNAPSHOT-jar-with-dependencies.jar com.example.chief.consumer.ChiefJobResultElasticsearchExecutor > ~/chief/logs/ChiefJobResultElasticsearchExecutor.log) \
-    &> ~/chief/logs/ChiefJobResultElasticsearchExecutor.log" &
-   ```
+  ```
+  nohup bash -c \
+  "(java -cp ./target/Kinesis-Chief-0.0.1-SNAPSHOT-jar-with-dependencies.jar com.example.chief.consumer.ChiefJobResultElasticsearchExecutor > ~/chief/logs/ChiefJobResultElasticsearchExecutor.log) \
+  &> ~/chief/logs/ChiefJobResultElasticsearchExecutor.log" &
+  ```
 
 9. On KCL instance, Run job results stream consumer (6) in diagram
-   ```
-   nohup bash -c \
-   "(java -cp ./target/Kinesis-Chief-0.0.1-SNAPSHOT-jar-with-dependencies.jar com.example.chief.consumer.ChiefJobResultNotifyS3Executor > ~/chief/logs/ChiefJobResultNotifyS3Executor.log) \
-    &> ~/chief/logs/ChiefJobResultNotifyS3Executor.log" &
-   ```
+  ```
+  nohup bash -c \
+  "(java -cp ./target/Kinesis-Chief-0.0.1-SNAPSHOT-jar-with-dependencies.jar com.example.chief.consumer.ChiefJobResultNotifyS3Executor > ~/chief/logs/ChiefJobResultNotifyS3Executor.log) \
+   &> ~/chief/logs/ChiefJobResultNotifyS3Executor.log" &
+  ```
 10. Load job results data periodically from S3 to Aurora for final de-duplication. This can be done with follwing SQL.
-```
-use chief;
-LOAD DATA FROM S3 PREFIX 's3://bucket/ChiefJobResultNotifyS3/2017/10/17/17/'
-IGNORE
-INTO TABLE jobresults
-(orderid, userid, factoryid, robotid, jobstatus, timestamp);
-```
+  ```
+  use chief;
+  LOAD DATA FROM S3 PREFIX 's3://bucket/ChiefJobResultNotifyS3/2017/10/17/17/'
+  IGNORE
+  INTO TABLE jobresults
+  (orderid, userid, factoryid, robotid, jobstatus, timestamp);
+  ```
 
 11. Open https://search-domainname-example.us-east-1.es.amazonaws.com/_plugin/kibana/ from your browser. This URL is the endpoint of Elasticsearch Service domain. Make sure the access policy of domain is open from your environment.
 
