@@ -1,16 +1,37 @@
-# chief
+# chief Incorporated
 
 ## Overview
-This is an end-to-end [AWS Kinesis Streams](https://aws.amazon.com/kinesis/streams/) processing example using the [AWS Kinesis Producer Library (KPL)](http://docs.aws.amazon.com/streams/latest/dev/developing-producers-with-kpl.html) to send records to a Kinesis stream, consume from the stream using the [AWS Kinesis Client Library (KCL)](http://docs.aws.amazon.com/streams/latest/dev/developing-consumers-with-kcl.html) and archive data to an [Amazon S3](http://docs.aws.amazon.com/AmazonS3/latest/dev/Welcome.html) bucket. Additionally, a second KCL consumer de-duplicates the consumed records and provides realtime data updates to a web front-end.
+This is an end-to-end [AWS Kinesis Streams](https://aws.amazon.com/kinesis/streams/)  applications simulating a Just In Time Manufacturer of clothes utilizing Robo-Tailors.
+
+The company “Chief Inc” is a “Just In Time” manufacturer of clothes on Demand and it prides itself on been able to complete a customer’s order within 24 hours. Customers of Chief Inc. can either submit their orders online by choosing the material, the design type from a list of templates as well as their sizes or go to a store and choose a custom design and custom sizes for their order.
+An order submitted online looks like below:
+{“id”:”123”, “gender”:”M”, “size”:”L”,”material”:”Linen”, “design”: “Aqua”}
+
+An order submitted at a store can look like below
+{{“id”:”433”, “gender”:”F”, “size”: {“bust”:”22”, “weight”:”140”, “hip”:”50”, waist:”22”}}
+,”material”:”cotton”, “design”: “custom”}
+
+Design Reference Table
+{“gender”:”male”, “type”:[“aqua”,”black”,”visor”,”repeat”,”peculiar”]}
+{“gender”:”female”, “type”:[“tourquiose”,”velvet”,”remebrance”,”relax”,”awesome”]}
+
+Once the orders are submitted, the company will like the orders to be routed to robot-tailors that will handle jobs in real-time.
+Chief Inc. does not keep any inventory of materials in his factory. Chief Inc has 4 robo-factories situated in each geographical zone in the US and 50 stores in the United States.
+
+This simulation uses the [AWS Kinesis Producer Library (KPL)](http://docs.aws.amazon.com/streams/latest/dev/developing-producers-with-kpl.html) to send customer order records to a Kinesis stream called OrderStream.
+The Robo Tailors consume from the stream using the [AWS Kinesis Client Library (KCL)](http://docs.aws.amazon.com/streams/latest/dev/developing-consumers-with-kcl.html)
+and archive orders data to an [Amazon S3](http://docs.aws.amazon.com/AmazonS3/latest/dev/Welcome.html) bucket.
+The Robot Tailors also use the KPL to send completed orders to an Amazon Kinesis Stream (JobResultsStream) whose KCL consumers then consume the records updates an elasticsearch cluster, notify customers and then archive results.
+
 
 The application consists of 5 components:
 
-1. Scripts to generate data in the format required by the application(s)
+1. Scripts to generate sample data records in the format required by the application(s)
 2. Kinesis producer applications for orders and job results
-3. Orders stream consumer KCL application that archives de-duped datas to S3
-4. Orders stream consumer KCL application that archives de-duped datas to S3 and Elasticsearch
-5. Job result stream consumer KCL application that archives de-duped datas to S3
-6. Job result stream consumer KCL application that archives de-duped datas to Elasticsearch
+3. Orders stream consumer KCL application that archives de-duplicated data records to S3
+4. Orders stream consumer KCL application that archives de-duplicated data records to S3 and Elasticsearch
+5. Job result stream consumer KCL application that archives de-duplicated data records to S3
+6. Job result stream consumer KCL application that archives de-duplicated data record to Elasticsearch
 
 ## Architecture Diagrams:
 ![alt tag](https://github.com/rirakuchell/chief/blob/master/architecture-diagram.png)
@@ -18,7 +39,7 @@ The application consists of 5 components:
 ## Requirements
 1. An Amazon Web Services [Account](https://portal.aws.amazon.com/billing/signup#/start)
 2. AWS CLI Installed and configured
-3. After following the steps in the **Setting up the environment** section, you will have set up the following resources:  
+3. After following the steps in the **Setting up the environment** section, you will have set up the following resources:
   3.1. Two Amazon Kinesis Streams named ```OrdersStream``` and ```JobResultsStream```
   3.2. Two IAM roles, Instance Profiles and [Policies](http://docs.aws.amazon.com/streams/latest/dev/controlling-access.html) required for the KCL and KPL instances
   3.3. Two AWS EC2 Instances based on AmazonLinux with dependencies pre-installed
@@ -42,29 +63,29 @@ The application consists of 5 components:
     aws iam create-role \
     --role-name Chief-KPLRole \
     --assume-role-policy-document '{
-        "Version": "2012-10-17",  
-        "Statement": [{  
-            "Sid": "",  
-            "Effect": "Allow",  
-            "Principal": {  
-                "Service": "ec2.amazonaws.com"  
-            },  
-            "Action": "sts:AssumeRole"  
-        }]  
+        "Version": "2012-10-17",
+        "Statement": [{
+            "Sid": "",
+            "Effect": "Allow",
+            "Principal": {
+                "Service": "ec2.amazonaws.com"
+            },
+            "Action": "sts:AssumeRole"
+        }]
     }'
 
     aws iam create-role \
     --role-name Chief-KCLRole \
     --assume-role-policy-document '{
-      "Version": "2012-10-17",  
-      "Statement": [{  
-          "Sid": "",  
-          "Effect": "Allow",  
-          "Principal": {  
-              "Service": "ec2.amazonaws.com"  
-          },  
-          "Action": "sts:AssumeRole"  
-      }]  
+      "Version": "2012-10-17",
+      "Statement": [{
+          "Sid": "",
+          "Effect": "Allow",
+          "Principal": {
+              "Service": "ec2.amazonaws.com"
+          },
+          "Action": "sts:AssumeRole"
+      }]
     }'
 
   aws iam create-instance-profile --instance-profile-name Chief-KCLRole
@@ -76,22 +97,22 @@ The application consists of 5 components:
   aws iam add-role-to-instance-profile --instance-profile-name Chief-KCLRole --role-name Chief-KCLRole
   ```
 
-3. Create the Kinesis IAM Policies  (Please replace the account ids with your own account id)
+3. Create the Kinesis IAM Policies  (Please replace the account ids with your own account id and the aws region with the region in which you will like your applications to run )
   ```
   aws iam create-policy \
   --policy-name Chief-KPLPolicy \
   --policy-document '{
-      "Version": "2012-10-17",  
-      "Statement": [{  
-          "Effect": "Allow",  
-          "Action": ["kinesis:PutRecord","kinesis:PutRecords","kinesis:DescribeStream"],  
-          "Resource": ["arn:aws:kinesis:us-east-1:111122223333:stream/OrdersStream","arn:aws:kinesis:us-east-1:111122223333:stream/JobResultsStream"]  
+      "Version": "2012-10-17",
+      "Statement": [{
+          "Effect": "Allow",
+          "Action": ["kinesis:PutRecord","kinesis:PutRecords","kinesis:DescribeStream"],
+          "Resource": ["arn:aws:kinesis:us-east-1:111122223333:stream/OrdersStream","arn:aws:kinesis:us-east-1:111122223333:stream/JobResultsStream"]
       },
-      {  
-          "Sid": "Stmt1482832527000",  
-          "Effect": "Allow",  
-          "Action": ["cloudwatch:PutMetricData"],  
-          "Resource": ["*"]  
+      {
+          "Sid": "Stmt1482832527000",
+          "Effect": "Allow",
+          "Action": ["cloudwatch:PutMetricData"],
+          "Resource": ["*"]
       }
       ]
   }'
@@ -100,11 +121,11 @@ The application consists of 5 components:
   --policy-name Chief-KCLPolicy \
   --policy-document '{
       "Version": "2012-10-17",
-      "Statement": [{  
-          "Effect": "Allow",  
-          "Action": ["kinesis:Get*"],  
+      "Statement": [{
+          "Effect": "Allow",
+          "Action": ["kinesis:Get*"],
           "Resource": ["arn:aws:kinesis:us-east-1:111122223333:stream/OrdersStream","arn:aws:kinesis:us-east-1:111122223333:stream/JobResultsStream"]
-      }, 
+      },
       {
             "Effect": "Allow",
             "Action": [
@@ -112,28 +133,28 @@ The application consists of 5 components:
             ],
             "Resource": ["arn:aws:s3:::ChiefS3Bucket-","arn:aws:s3:::<BUCKET_NAME>/*"]
         },
-      {  
-          "Effect": "Allow",  
-          "Action": ["kinesis:DescribeStream"],  
-          "Resource": ["arn:aws:kinesis:us-east-1:111122223333:stream/OrdersStream","arn:aws:kinesis:us-east-1:111122223333:stream/JobResultsStream"]  
-      }, {  
-          "Effect": "Allow",  
-          "Action": ["kinesis:ListStreams"],  
-          "Resource": ["*"]  
-      }, {  
-          "Effect": "Allow",  
-          "Action": ["dynamodb:CreateTable", "dynamodb:DescribeTable", "dynamodb:Scan", "dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:GetItem"],  
-          "Resource": ["arn:aws:dynamodb:us-east-1:111122223333:table/Chief*"]  
-      }, {  
-          "Sid": "Stmt1482832527000",  
-          "Effect": "Allow",  
-          "Action": ["cloudwatch:PutMetricData"],  
-          "Resource": ["*"]  
-      }]  
+      {
+          "Effect": "Allow",
+          "Action": ["kinesis:DescribeStream"],
+          "Resource": ["arn:aws:kinesis:us-east-1:111122223333:stream/OrdersStream","arn:aws:kinesis:us-east-1:111122223333:stream/JobResultsStream"]
+      }, {
+          "Effect": "Allow",
+          "Action": ["kinesis:ListStreams"],
+          "Resource": ["*"]
+      }, {
+          "Effect": "Allow",
+          "Action": ["dynamodb:CreateTable", "dynamodb:DescribeTable", "dynamodb:Scan", "dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:GetItem"],
+          "Resource": ["arn:aws:dynamodb:us-east-1:111122223333:table/Chief*"]
+      }, {
+          "Sid": "Stmt1482832527000",
+          "Effect": "Allow",
+          "Action": ["cloudwatch:PutMetricData"],
+          "Resource": ["*"]
+      }]
   }'
   ```
 
-4. Attach the Policies to the Roles  
+4. Attach the Policies to the Roles
   ```
   aws iam attach-role-policy \
   --policy-arn "arn:aws:iam::111122223333:policy/Chief-KPLPolicy" \
@@ -144,7 +165,7 @@ The application consists of 5 components:
   --role-name Chief-KCLRole
   ```
 
-5. Create a Bootstrap script to automate the installation of the dependencies on newly launched instances 
+5. Create a Bootstrap script to automate the installation of the dependencies on newly launched instances
   ```
   cat <<EOF > Bootstrap.sh
   #!/bin/bash
@@ -190,7 +211,7 @@ aws es create-elasticsearch-domain --domain-name chief --elasticsearch-version 5
 
 9. Set up Elasticsearch domain access policy
   Set up Elasticsearch domain access policy IP addresses to connect from KPL/KCL app instances.
-  
+
   ```
   aws es update-elasticsearch-domain-config --domain-name chief --access-policies '{"Version": "2012-10-17", "Statement": [{"Action": "es:ESHttp*","Principal":"*","Effect": "Allow", "Condition": {"IpAddress":{"aws:SourceIp":["192.0.2.0/32"]}}}]}'
   ```
@@ -245,7 +266,7 @@ aws es create-elasticsearch-domain --domain-name chief --elasticsearch-version 5
 3. Login to the Aurora DB instance from the ec2 instance and create the orders and jobresults table by using the ddl chiefdb.sql located in ~/chief/src/main/resources/chiefdb.sql
 ```
 mysql -h chiefcluster.cluster-EXAMPLE.us-east-1.rds.amazonaws.com -u username -p********** mysql < ~/chief/src/main/resources/chiefdb.sql
-```  
+```
 4. SSH into the KCL Instance and edit Edit the *.properties file for KCL application in ```~/chief/src/main/resources/``` folder. Please change the values for your own AWS resources and KCL application names. For details of each property names, please see the actual property files.
  - ```OrderFactoryS3.properties``` : The setting of KCL application (2) in diagram
  - ```OrderElasticsearchS3.properties``` : The setting of KCL application (4) in diagram
