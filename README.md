@@ -3,17 +3,17 @@
 ## Overview
 This is an end-to-end [AWS Kinesis Streams](https://aws.amazon.com/kinesis/streams/)  applications simulating a Just In Time Manufacturer of clothes utilizing Robo-Tailors.
 
-The company “Chief Inc” is a “Just In Time” manufacturer of clothes on Demand and it prides itself on been able to complete a customer’s order within 24 hours. Customers of Chief Inc. can either submit their orders online by choosing the material, the design type from a list of templates as well as their sizes or go to a store and choose a custom design and custom sizes for their order.
+The company "Chief Inc" is a "Just In Time" manufacturer of clothes on Demand and it prides itself on been able to complete a customer’s order within 24 hours. Customers of Chief Inc. can either submit their orders online by choosing the material, the design type from a list of templates as well as their sizes or go to a store and choose a custom design and custom sizes for their order.
 An order submitted online looks like below:
-{“id”:”123”, “gender”:”M”, “size”:”L”,”material”:”Linen”, “design”: “Aqua”}
+{"id":"123", "gender":"M", "size":"L","material":"Linen", "design": "Aqua"}
 
 An order submitted at a store can look like below
-{{“id”:”433”, “gender”:”F”, “size”: {“bust”:”22”, “weight”:”140”, “hip”:”50”, waist:”22”}}
-,”material”:”cotton”, “design”: “custom”}
+{{"id":"433", "gender":"F", "size": {"bust":"22", "weight":"140", "hip":"50", waist:"22"}}
+,"material":"cotton", "design": "custom"}
 
 Design Reference Table
-{“gender”:”male”, “type”:[“aqua”,”black”,”visor”,”repeat”,”peculiar”]}
-{“gender”:”female”, “type”:[“tourquiose”,”velvet”,”remebrance”,”relax”,”awesome”]}
+{"gender":"male", "type":["aqua","black","visor","repeat","peculiar"]}
+{"gender":"female", "type":["tourquiose","velvet","remebrance","relax","awesome"]}
 
 Once the orders are submitted, the company will like the orders to be routed to robot-tailors that will handle jobs in real-time.
 Chief Inc. does not keep any inventory of materials in his factory. Chief Inc has 4 robo-factories situated in each geographical zone in the US and 50 stores in the United States.
@@ -186,16 +186,23 @@ The application consists of 5 components:
   ```
 
 6. Create an Amazon Aurora cluster and take note of the cluster endpoint, username and password
+First create Aurora DB cluster.
   ```
-aws rds create-db-cluster --db-cluster-identifier chiefcluster --engine aurora \
-     --master-username user-name --master-user-password ******* \
-     --db-subnet-group-name mysubnetgroup --vpc-security-group-ids sg-c7e5b0d2
+  aws rds create-db-cluster --db-cluster-identifier chiefcluster --engine aurora \
+       --master-username user-name --master-user-password ******* \
+       --db-subnet-group-name mysubnetgroup --vpc-security-group-ids sg-c7e5b0d2
   ```
 
   Please make sure to set the security group ```--vpc-security-group-ids``` is set to connect from KPL/KCL app/generator script instances.
 
-Also the Aurora cluster must be configured to be able to read orders and job results data from S3. Please refer to the following document to complete this.
- - http://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Aurora.LoadFromS3.html
+  Next create DB instance for this cluster.
+  ```
+  aws rds create-db-instance --db-instance-identifier chiefinstance \
+     --db-cluster-identifier chiefcluster --engine aurora --db-instance-class db.r3.large
+  ```
+
+  Also the Aurora cluster must be configured to be able to read orders and job results data from S3. Please refer to the following document to complete this.
+ - http://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/AuroraMySQL.Integrating.LoadFromS3.html
 
 7. Create an Amazon S3 bucket
   Please change the bucket name that you specified step 3.
@@ -279,11 +286,15 @@ cd ~/chief
 mvn clean compile assembly:single
 ```
 7. On KPL Instance, Generate orders data using python script and put into Orders Stream using chief-producer.
-```
-python ./scripts/generateOnlineOrders.py 1 1000
-python ./scripts/generateStoreOrders.py 1 1000
-nohup java -cp ./target/Kinesis-Chief-0.0.1-SNAPSHOT-jar-with-dependencies.jar com.example.chief.producer.ChiefOrderProducerExecutor
-```
+   ```
+   python ./scripts/generateOnlineOrders.py 1 1000
+   python ./scripts/generateStoreOrders.py 1 1000
+   ```
+   ```
+   nohup bash -c \
+   "(java -cp ./target/Kinesis-Chief-0.0.1-SNAPSHOT-jar-with-dependencies.jar com.example.chief.producer.ChiefOrderProducerExecutor > ~/chief/logs/ChiefOrderProducerExecutor.log) \
+    &> ~/chief/logs/ChiefOrderProducerExecutor.log" &
+   ```
 Once this is done, check Kinesis Streams metrics(e.g. PutRecords.Records) to confirm the put is successfully. The generated data will be backed up to "backup" folder in "dataFolder" property.
 8. On KCL Instance, Build the program using Maven.
 ```
@@ -291,16 +302,19 @@ cd ~/chief
 mvn clean compile assembly:single
 ```
 9. On KCL Instance, Run orders stream consumer (2) in diagram
-```
-nohup java -cp ./target/Kinesis-Chief-0.0.1-SNAPSHOT-jar-with-dependencies.jar com.example.chief.consumer.ChiefOrderFactoryS3Executor
-```
+   ```
+   nohup bash -c \
+   "(java -cp ./target/Kinesis-Chief-0.0.1-SNAPSHOT-jar-with-dependencies.jar com.example.chief.consumer.ChiefOrderFactoryS3Executor > ~/chief/logs/ChiefOrderFactoryS3Executor.log) \
+    &> ~/chief/logs/ChiefOrderFactoryS3Executor.log" &
+   ```
 The order data will be consumed from Kinesis Stream and put to S3 like key ```s3://bucket/ChiefOrderS3/2017/10/18/16/shardId-000000000000-49577848089610314880664684998647902014807844560960487426```
 
 9. On KCL Instance, Run orders stream consumer (4) in diagram
-```
-cd ~/chief
-nohup java -cp ./target/Kinesis-Chief-0.0.1-SNAPSHOT-jar-with-dependencies.jar com.example.chief.consumer.ChiefOrderElasticsearchS3Executor
-```
+   ```
+   nohup bash -c \
+   "(java -cp ./target/Kinesis-Chief-0.0.1-SNAPSHOT-jar-with-dependencies.jar com.example.chief.consumer.ChiefOrderElasticsearchS3Executor > ~/chief/logs/ChiefOrderElasticsearchS3Executor.log) \
+    &> ~/chief/logs/ChiefOrderElasticsearchS3Executor.log" &
+   ```
 The order data will be put to Elasticsearch.
 10. Load orders data periodically from S3 to Aurora for final de-duplication. This can be done with follwing SQL.
 ```
@@ -311,20 +325,28 @@ INTO TABLE orders
 (orderid, orderdata);
 ```
 7. On KPL instance,Generate job results data using python script and put into Job results Stream using chief-producer.
-```
-python ./scripts/generateJobResults.py 1 1000
-nohup java -cp ./target/Kinesis-Chief-0.0.1-SNAPSHOT-jar-with-dependencies.jar com.example.chief.producer.ChiefJobResultsProducerExecutor
-```
-8. Run job results stream consumer (5) in diagram
-```
-cd ~/chief
-nohup java -cp ./target/Kinesis-Chief-0.0.1-SNAPSHOT-jar-with-dependencies.jar com.example.chief.consumer.ChiefJobResultElasticsearchExecutor
-```
+   ```
+   cd ~/chief
+   python ./scripts/generateJobResults.py 1 1000
+   ```
+   ```
+   nohup bash -c \
+   "(java -cp ./target/Kinesis-Chief-0.0.1-SNAPSHOT-jar-with-dependencies.jar com.example.chief.producer.ChiefJobResultsProducerExecutor > ~/chief/logs/ChiefJobResultsProducerExecutor.log) \
+    &> ~/chief/logs/ChiefJobResultsProducerExecutor.log" &
+   ```
+8. On KCL instance, Run job results stream consumer (5) in diagram
+   ```
+   nohup bash -c \
+   "(java -cp ./target/Kinesis-Chief-0.0.1-SNAPSHOT-jar-with-dependencies.jar com.example.chief.consumer.ChiefJobResultElasticsearchExecutor > ~/chief/logs/ChiefJobResultElasticsearchExecutor.log) \
+    &> ~/chief/logs/ChiefJobResultElasticsearchExecutor.log" &
+   ```
 
-9. Run job results stream consumer (6) in diagram
-```
-nohup java -cp ./target/Kinesis-Chief-0.0.1-SNAPSHOT-jar-with-dependencies.jar com.example.chief.consumer.ChiefJobResultNotifyS3Executor
-```
+9. On KCL instance, Run job results stream consumer (6) in diagram
+   ```
+   nohup bash -c \
+   "(java -cp ./target/Kinesis-Chief-0.0.1-SNAPSHOT-jar-with-dependencies.jar com.example.chief.consumer.ChiefJobResultNotifyS3Executor > ~/chief/logs/ChiefJobResultNotifyS3Executor.log) \
+    &> ~/chief/logs/ChiefJobResultNotifyS3Executor.log" &
+   ```
 10. Load job results data periodically from S3 to Aurora for final de-duplication. This can be done with follwing SQL.
 ```
 use chief;
