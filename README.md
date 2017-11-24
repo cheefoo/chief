@@ -305,14 +305,8 @@ mvn clean compile assembly:single
 7. On KPL Instance, Generate orders data using python script and put into Orders Stream using chief-producer.
   First generate online orders and store orders.
   ```
-  nohup bash -c \
-  "(python ./scripts/generateOnlineOrders.py 1 1000 > ~/chief/logs/generateOnlineOrders.log) \
-   &> ~/chief/logs/generateOnlineOrders.log" &
-  ```
-  ```
-  nohup bash -c \
-  "(python ./scripts/generateStoreOrders.py 1 1000 > ~/chief/logs/generateStoreOrders.log) \
-   &> ~/chief/logs/generateStoreOrders.log" &
+  python ./scripts/generateOnlineOrders.py 1 1000
+  python ./scripts/generateStoreOrders.py 1 1000
   ```
   Next put it into OrdersStream Kinesis stream.
   ```
@@ -342,14 +336,18 @@ mvn clean compile assembly:single
    &> ~/chief/logs/ChiefOrderElasticsearchS3Executor.log" &
   ```
   The order data will be put to Elasticsearch.
-11. Load orders data periodically from S3 to Aurora for final de-duplication.
+11. On KCL instance, load orders and job results data periodically from S3 to Aurora for final de-duplication. This can be done with following cron settings
+  ```
+  crontab -e
+  ```
+  Specify follwing cron setting. loadS3DataToAurora.py loads data from S3 to Aurora cluster.
+  ```
+  */5 * * * * . /etc/profile;python /home/ec2-user/chief/scripts/loadS3DataToAurora.py > /home/ec2-user/chief/logs/loadS3DataToAurora.txt 2>&1
+  ```
 
 12. On KPL instance,Generate job results data using python script and put into Job results Stream using chief-producer.
   ```
-  cd ~/chief
-  nohup bash -c \
-  "(python ./scripts/generateJobResults.py 1 1000 > ~/chief/logs/generateJobResults.log) \
-   &> ~/chief/logs/generateJobResults.log" &
+  python ./scripts/generateJobResults.py 1 1000
   ```
   generateJobResults.py connects Aurora cluster to load orders data. Environment variables that set by userdata script are used as DB connection configuration(e.g. DB_USER).
   ```
@@ -370,7 +368,6 @@ mvn clean compile assembly:single
   "(java -cp ./target/Kinesis-Chief-0.0.1-SNAPSHOT-jar-with-dependencies.jar com.example.chief.consumer.ChiefJobResultNotifyS3Executor > ~/chief/logs/ChiefJobResultNotifyS3Executor.log) \
    &> ~/chief/logs/ChiefJobResultNotifyS3Executor.log" &
   ```
-15. Load job results data periodically from S3 to Aurora for final de-duplication.
 
-16. Open https://search-domainname-example.us-east-1.es.amazonaws.com/_plugin/kibana/ from your browser. This URL is the endpoint of Elasticsearch Service domain. Make sure the access policy of domain is open from your environment.
+15. Open https://search-domainname-example.us-east-1.es.amazonaws.com/_plugin/kibana/ from your browser. This URL is the endpoint of Elasticsearch Service domain. Make sure the access policy of domain is open from your environment.
 
