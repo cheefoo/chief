@@ -336,6 +336,7 @@ mvn clean compile assembly:single
    &> ~/chief/logs/ChiefOrderElasticsearchS3Executor.log" &
   ```
   The order data will be put to Elasticsearch.
+
 11. On KCL instance, load orders and job results data periodically from S3 to Aurora for final de-duplication. This can be done with following cron settings
   ```
   crontab -e
