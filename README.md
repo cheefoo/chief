@@ -288,9 +288,9 @@ aws es create-elasticsearch-domain --domain-name chief --elasticsearch-version 5
   | producerDuration     | 7200 | The duration of running producer program.|
 2. Edit the log4j.properties file for log4j in ```~/chief/src/main/resources/``` folder.
 3. Login to the Aurora DB instance from the ec2 instance and create the orders and jobresults table by using the ddl chiefdb.sql located in ~/chief/src/main/resources/chiefdb.sql
-```
-mysql -h chiefcluster.cluster-EXAMPLE.us-east-1.rds.amazonaws.com -u username -p********** mysql < ~/chief/src/main/resources/chiefdb.sql
-```
+  ```
+  mysql -h ${DB_HOST} -u ${DB_USER} -p${DB_PASSWORD} mysql < ~/chief/src/main/resources/chiefdb.sql
+  ```
 4. SSH into the KCL Instance and edit Edit the *.properties file for KCL application in ```~/chief/src/main/resources/``` folder. Please change the values for your own AWS resources and KCL application names. For details of each property names, please see the actual property files.
  - ```OrderFactoryS3.properties``` : The setting of KCL application (2) in diagram
  - ```OrderElasticsearchS3.properties``` : The setting of KCL application (4) in diagram
@@ -303,10 +303,18 @@ cd ~/chief
 mvn clean compile assembly:single
 ```
 7. On KPL Instance, Generate orders data using python script and put into Orders Stream using chief-producer.
+  First generate online orders and store orders.
   ```
-  python ./scripts/generateOnlineOrders.py 1 1000
-  python ./scripts/generateStoreOrders.py 1 1000
+  nohup bash -c \
+  "(python ./scripts/generateOnlineOrders.py 1 1000 > ~/chief/logs/generateOnlineOrders.log) \
+   &> ~/chief/logs/generateOnlineOrders.log" &
   ```
+  ```
+  nohup bash -c \
+  "(python ./scripts/generateStoreOrders.py 1 1000 > ~/chief/logs/generateStoreOrders.log) \
+   &> ~/chief/logs/generateStoreOrders.log" &
+  ```
+  Next put it into OrdersStream Kinesis stream.
   ```
   nohup bash -c \
   "(java -cp ./target/Kinesis-Chief-0.0.1-SNAPSHOT-jar-with-dependencies.jar com.example.chief.producer.ChiefOrderProducerExecutor > ~/chief/logs/ChiefOrderProducerExecutor.log) \
@@ -327,19 +335,21 @@ mvn clean compile assembly:single
   ```
   The order data will be consumed from Kinesis Stream and put to S3 like key ```s3://bucket/ChiefOrderS3/2017/10/18/16/shardId-000000000000-49577848089610314880664684998647902014807844560960487426```
 
-9. On KCL Instance, Run orders stream consumer (4) in diagram
+10. On KCL Instance, Run orders stream consumer (4) in diagram
   ```
   nohup bash -c \
   "(java -cp ./target/Kinesis-Chief-0.0.1-SNAPSHOT-jar-with-dependencies.jar com.example.chief.consumer.ChiefOrderElasticsearchS3Executor > ~/chief/logs/ChiefOrderElasticsearchS3Executor.log) \
    &> ~/chief/logs/ChiefOrderElasticsearchS3Executor.log" &
   ```
   The order data will be put to Elasticsearch.
-10. Load orders data periodically from S3 to Aurora for final de-duplication.
+11. Load orders data periodically from S3 to Aurora for final de-duplication.
 
-11. On KPL instance,Generate job results data using python script and put into Job results Stream using chief-producer.
+12. On KPL instance,Generate job results data using python script and put into Job results Stream using chief-producer.
   ```
   cd ~/chief
-  python ./scripts/generateJobResults.py 1 1000
+  nohup bash -c \
+  "(python ./scripts/generateJobResults.py 1 1000 > ~/chief/logs/generateJobResults.log) \
+   &> ~/chief/logs/generateJobResults.log" &
   ```
   generateJobResults.py connects Aurora cluster to load orders data. Environment variables that set by userdata script are used as DB connection configuration(e.g. DB_USER).
   ```
@@ -347,20 +357,20 @@ mvn clean compile assembly:single
   "(java -cp ./target/Kinesis-Chief-0.0.1-SNAPSHOT-jar-with-dependencies.jar com.example.chief.producer.ChiefJobResultsProducerExecutor > ~/chief/logs/ChiefJobResultsProducerExecutor.log) \
    &> ~/chief/logs/ChiefJobResultsProducerExecutor.log" &
   ```
-12. On KCL instance, Run job results stream consumer (5) in diagram
+13. On KCL instance, Run job results stream consumer (5) in diagram
   ```
   nohup bash -c \
   "(java -cp ./target/Kinesis-Chief-0.0.1-SNAPSHOT-jar-with-dependencies.jar com.example.chief.consumer.ChiefJobResultElasticsearchExecutor > ~/chief/logs/ChiefJobResultElasticsearchExecutor.log) \
   &> ~/chief/logs/ChiefJobResultElasticsearchExecutor.log" &
   ```
 
-13. On KCL instance, Run job results stream consumer (6) in diagram
+14. On KCL instance, Run job results stream consumer (6) in diagram
   ```
   nohup bash -c \
   "(java -cp ./target/Kinesis-Chief-0.0.1-SNAPSHOT-jar-with-dependencies.jar com.example.chief.consumer.ChiefJobResultNotifyS3Executor > ~/chief/logs/ChiefJobResultNotifyS3Executor.log) \
    &> ~/chief/logs/ChiefJobResultNotifyS3Executor.log" &
   ```
-14. Load job results data periodically from S3 to Aurora for final de-duplication.
+15. Load job results data periodically from S3 to Aurora for final de-duplication.
 
-15. Open https://search-domainname-example.us-east-1.es.amazonaws.com/_plugin/kibana/ from your browser. This URL is the endpoint of Elasticsearch Service domain. Make sure the access policy of domain is open from your environment.
+16. Open https://search-domainname-example.us-east-1.es.amazonaws.com/_plugin/kibana/ from your browser. This URL is the endpoint of Elasticsearch Service domain. Make sure the access policy of domain is open from your environment.
 
