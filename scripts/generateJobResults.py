@@ -23,10 +23,10 @@ if len(sys.argv) != 3:
 numberRuns = int(sys.argv[1])
 numberRows = int(sys.argv[2])
 
-DB_USER = 'user'
-DB_PASSWORD = '***********'
-DB_HOST = 'chiefcluster.cluster-cexample.us-east-1.rds.amazonaws.com'
-DB_NAME = 'chief'
+DB_USER = os.getenv("DB_USER")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
+DB_HOST = os.getenv("DB_HOST")
+DB_NAME = os.getenv("DB_NAME")
 
 conn = mysql.connector.connect(user=DB_USER, password=DB_PASSWORD, host=DB_HOST, database=DB_NAME)
 cur = conn.cursor(prepared=True)
