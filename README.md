@@ -371,6 +371,8 @@ mvn clean compile assembly:single
 
 15. Open https://search-domainname-example.us-east-1.es.amazonaws.com/_plugin/kibana/ from your browser. This URL is the endpoint of Elasticsearch Service domain. Make sure the access policy of domain is open from your environment.
 
+At first create two index patterns "chieforders-*" and "chiefjobresults-*". Then you can query orders and job results put from KCL application.
+
 Following screenshot is sample dashboard.
 ![alt tag](https://github.com/rirakuchell/chief/blob/master/chief-samplegraph.png)
 
