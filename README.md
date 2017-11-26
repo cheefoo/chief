@@ -40,12 +40,12 @@ The application consists of 5 components:
 1. An Amazon Web Services [Account](https://portal.aws.amazon.com/billing/signup#/start)
 2. AWS CLI Installed and configured
 3. After following the steps in the **Setting up the environment** section, you will have set up the following resources:
-  3.1. Two Amazon Kinesis Streams named ```OrdersStream``` and ```JobResultsStream```
-  3.2. Two IAM roles, Instance Profiles and [Policies](http://docs.aws.amazon.com/streams/latest/dev/controlling-access.html) required for the KCL and KPL instances
-  3.3. Two AWS EC2 Instances based on AmazonLinux with dependencies pre-installed
-  3.3. An Amazon Aurora cluster(for final de-dupe)
-  3.4. An Amazon Elasticsearch Service domain
-  3.5. An Amazon S3 bucket
+    - Two Amazon Kinesis Streams named ```OrdersStream``` and ```JobResultsStream```
+    - Two IAM roles, Instance Profiles and [Policies](http://docs.aws.amazon.com/streams/latest/dev/controlling-access.html) required for the KCL and KPL instances
+    - Two AWS EC2 Instances based on AmazonLinux with dependencies pre-installed
+    - An Amazon Aurora cluster(for final de-dupe)
+    - An Amazon Elasticsearch Service domain
+    - An Amazon S3 bucket
 4. When the KCL is initiated, DynamoDB tables for each applications are created
 
 - Create tables for orders and job results in Aurora cluster like follwing SQL
