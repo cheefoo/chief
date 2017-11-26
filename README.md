@@ -371,3 +371,12 @@ mvn clean compile assembly:single
 
 15. Open https://search-domainname-example.us-east-1.es.amazonaws.com/_plugin/kibana/ from your browser. This URL is the endpoint of Elasticsearch Service domain. Make sure the access policy of domain is open from your environment.
 
+Following screenshot is sample dashboard.
+![alt tag](https://github.com/rirakuchell/chief/blob/master/chief-samplegraph.png)
+
+I made following json file in "essavedobjects" folder for creating visualize and dashboard. You can import them "Management" -> "Saved Objects"
+- ```genderchart.json```: how many orders are handled per hour for a gender type
+- ```genderFdesigns.json```: how many custom orders are of gender type female and design type velvet per hour
+- ```CompletedJobPerFactoryPerRobot.json```: completed requests per hour per factory per robot
+- ```ChiefDashboard.json```: a sample dashboard
+
