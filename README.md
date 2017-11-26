@@ -131,7 +131,7 @@ The application consists of 5 components:
             "Action": [
                 "s3:*"
             ],
-            "Resource": ["arn:aws:s3:::ChiefS3Bucket-","arn:aws:s3:::<BUCKET_NAME>/*"]
+            "Resource": ["arn:aws:s3:::Chief-S3Bucket","arn:aws:s3:::<BUCKET_NAME>/*"]
         },
       {
           "Effect": "Allow",
@@ -165,7 +165,44 @@ The application consists of 5 components:
   --role-name Chief-KCLRole
   ```
 
-5. Create a Bootstrap script to automate the installation of the dependencies on newly launched instances
+5. Create an Amazon Aurora cluster and take note of the cluster endpoint, username and password
+First create Aurora DB cluster.
+  ```
+  aws rds create-db-cluster --db-cluster-identifier chiefcluster --engine aurora \
+       --master-username user-name --master-user-password ******* \
+       --db-subnet-group-name mysubnetgroup --vpc-security-group-ids sg-c7e5b0d2
+  ```
+
+  Please make sure to set the security group ```--vpc-security-group-ids``` is set to connect from KPL/KCL app/generator script instances.
+
+  Next create DB instance for this cluster.
+  ```
+  aws rds create-db-instance --db-instance-identifier chiefinstance \
+     --db-cluster-identifier chiefcluster --engine aurora --db-instance-class db.r3.large
+  ```
+
+  Also the Aurora cluster must be configured to be able to read orders and job results data from S3. Please refer to the following document to complete this.
+ - http://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/AuroraMySQL.Integrating.LoadFromS3.html
+
+6. Create an Amazon S3 bucket
+  Please change the bucket name that you specified step 3.
+
+  ```
+  aws s3 mb s3://Chief-S3Bucket
+  ```
+
+7. Create an Amazon Set up Elasticsearch Service domain
+  ```
+aws es create-elasticsearch-domain --domain-name chief --elasticsearch-version 5.5 --elasticsearch-cluster-config InstanceType=m4.large.elasticsearch,InstanceCount=1 --ebs-options EBSEnabled=true,VolumeType=gp2,VolumeSize=10
+  ```
+
+8. Set up Elasticsearch domain access policy
+  Set up Elasticsearch domain access policy IP addresses to connect from KPL/KCL app instances.
+
+  ```
+  aws es update-elasticsearch-domain-config --domain-name chief --access-policies '{"Version": "2012-10-17", "Statement": [{"Action": "es:ESHttp*","Principal":"*","Effect": "Allow", "Condition": {"IpAddress":{"aws:SourceIp":["192.0.2.0/32"]}}}]}'
+  ```
+9. Create a Bootstrap script to automate the installation of the dependencies on newly launched instances
   ```
   cat <<EOF > Bootstrap.sh
   #!/bin/bash
@@ -186,7 +223,7 @@ The application consists of 5 components:
   echo export DB_PASSWORD=******* >> /etc/profile
   echo export DB_HOST=chiefcluster.cluster-example.us-east-1.rds.amazonaws.com >> /etc/profile
   echo export DB_NAME=chief >> /etc/profile
-  echo export BUCKET_NAME=bucket-name >> /etc/profile
+  echo export BUCKET_NAME=Chief-S3Bucket >> /etc/profile
   echo export ORDERS_PREFIX=ChiefOrderS3 >> /etc/profile
   echo export JOBRESULTS_PREFIX=ChiefJobResultNotifyS3 >> /etc/profile
   EOF
@@ -198,47 +235,9 @@ The application consists of 5 components:
   | DB_USER    | dbuser| Database user for Aurora cluster. |
   | DB_PASSWORD   | \******* | Database password for Aurora cluster. |
   | DB_HOST    | chiefcluster.cluster-example.us-east-1.rds.amazonaws.com | Cluster endpoint of Aurora cluster.|
-  | BUCKET_NAME     | bucket-name | S3 bucket name where the file exists for reading into the Aurora cluster.|
+  | BUCKET_NAME     | Chief-S3Bucket | S3 bucket name where the file exists for reading into the Aurora cluster. Please change the bucket name that you specified step 3.|
   | ORDERS_PREFIX     | ChiefOrderS3 | S3 prefix where the file exists for reading into the Aurora cluster.|
   | JOBRESULTS_PREFIX     | ChiefJobResultNotifyS3 | S3 prefix where the file exists for reading into the Aurora cluster.|
-
-6. Create an Amazon Aurora cluster and take note of the cluster endpoint, username and password
-First create Aurora DB cluster.
-  ```
-  aws rds create-db-cluster --db-cluster-identifier chiefcluster --engine aurora \
-       --master-username user-name --master-user-password ******* \
-       --db-subnet-group-name mysubnetgroup --vpc-security-group-ids sg-c7e5b0d2
-  ```
-
-  Please make sure to set the security group ```--vpc-security-group-ids``` is set to connect from KPL/KCL app/generator script instances.
-
-  Next create DB instance for this cluster.
-  ```
-  aws rds create-db-instance --db-instance-identifier chiefinstance \
-     --db-cluster-identifier chiefcluster --engine aurora --db-instance-class db.r3.large
-  ```
-
-  Also the Aurora cluster must be configured to be able to read orders and job results data from S3. Please refer to the following document to complete this.
- - http://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/AuroraMySQL.Integrating.LoadFromS3.html
-
-7. Create an Amazon S3 bucket
-  Please change the bucket name that you specified step 3.
-
-  ```
-  aws s3 mb s3://Chief-S3Bucket
-  ```
-
-8. Create an Amazon Set up Elasticsearch Service domain
-  ```
-aws es create-elasticsearch-domain --domain-name chief --elasticsearch-version 5.5 --elasticsearch-cluster-config InstanceType=m4.large.elasticsearch,InstanceCount=1 --ebs-options EBSEnabled=true,VolumeType=gp2,VolumeSize=10
-  ```
-
-9. Set up Elasticsearch domain access policy
-  Set up Elasticsearch domain access policy IP addresses to connect from KPL/KCL app instances.
-
-  ```
-  aws es update-elasticsearch-domain-config --domain-name chief --access-policies '{"Version": "2012-10-17", "Statement": [{"Action": "es:ESHttp*","Principal":"*","Effect": "Allow", "Condition": {"IpAddress":{"aws:SourceIp":["192.0.2.0/32"]}}}]}'
-  ```
 
 10. Please note that image-id given in below command belongs to us-east-1, if you are launching in a different region please look up the image-id for that region [AWS Linux AMI IDs](https://aws.amazon.com/amazon-linux-ami/). Take note of the returned "InstanceId" after launching each instance in order to create tags
 
@@ -341,7 +340,7 @@ mvn clean compile assembly:single
   ```
   crontab -e
   ```
-  Specify follwing cron setting. loadS3DataToAurora.py loads data from S3 to Aurora cluster.
+  Specify follwing cron setting. "loadS3DataToAurora.py" loads data from S3 to Aurora cluster.
   ```
   */5 * * * * . /etc/profile;python /home/ec2-user/chief/scripts/loadS3DataToAurora.py > /home/ec2-user/chief/logs/loadS3DataToAurora.txt 2>&1
   ```
